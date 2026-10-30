@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "social-publish-mcp"
+dynamic = ["version"]
+description = "MCP server that uploads, schedules and publishes videos to YouTube, Facebook and TikTok through your own logged-in Chrome: no API keys, no app review"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+keywords = ["mcp", "model-context-protocol", "youtube", "youtube-shorts", "facebook-reels", "tiktok", "social-media",
+            "scheduler", "publishing", "claude", "claude-code", "cursor", "ai-agents", "chrome-extension"]
+dependencies = [
+    "mcp>=1.10,<2",
+    "websockets>=13",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "ruff>=0.6"]
+
+[project.urls]
+Homepage = "https://github.com/h4775346/social-publish-mcp"
+Issues = "https://github.com/h4775346/social-publish-mcp/issues"
+Changelog = "https://github.com/h4775346/social-publish-mcp/blob/main/CHANGELOG.md"
+
+[project.scripts]
+social-publish-mcp = "social_publish_mcp.server:main"
+
+[tool.hatch.version]
+path = "src/social_publish_mcp/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/social_publish_mcp"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "extension", "skill", "README.md", "LICENSE", "CHANGELOG.md"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 130
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "UP", "I"]

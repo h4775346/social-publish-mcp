@@ -1,0 +1,28 @@
+{
+  "max_parallel": 3,
+  "jobs": [
+    {
+      "platform": "youtube",
+      "video": "videos/short_01.mp4",
+      "title": "Sunset over the Nile in 30 seconds",
+      "caption_file": "captions/short_01_youtube.txt",
+      "tags": ["nile", "sunset", "shorts"],
+      "schedule_at": "2026-11-03T17:00+02:00",
+      "options": {"made_for_kids": false, "visibility": "public", "playlists": ["Shorts"]}
+    },
+    {
+      "platform": "tiktok",
+      "video": "videos/short_01.mp4",
+      "caption": "Wait for the last second 🌅 #nile #sunset #fyp",
+      "schedule_at": "2026-11-03T19:00+02:00",
+      "options": {"visibility": "everyone", "allow_comments": true}
+    },
+    {
+      "platform": "facebook",
+      "video": "videos/short_01.mp4",
+      "caption": "Wait for the last second 🌅 #nile #sunset",
+      "schedule_at": "2026-11-03T21:00+02:00",
+      "options": {"asset_id": "123456789012345"}
+    }
+  ]
+}

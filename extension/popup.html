@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    --bg: #fff; --surface: #f6f7f9; --line: #e3e5e8; --fg: #111418; --muted: #667085;
+    --btn-bg: #111418; --btn-fg: #fff; --ok: #1f9d46; --warn: #b7791f; --bad: #d92d20;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101214; --surface: #181b1f; --line: #2a2e34; --fg: #f2f4f7; --muted: #98a2b3;
+      --btn-bg: #f2f4f7; --btn-fg: #101214; --ok: #34c759; --warn: #ffb020; --bad: #ff453a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { width: 330px; margin: 0; padding: 14px; background: var(--bg); color: var(--fg);
+         font: 13px/1.45 "Segoe UI", system-ui, sans-serif; }
+  header { display: flex; align-items: center; gap: 10px; }
+  header img { width: 24px; height: 24px; }
+  h1 { flex: 1; margin: 0; font-size: 14px; }
+  .card { margin: 12px 0; padding: 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none; }
+  .ok .dot { background: var(--ok); } .busy .dot { background: var(--warn); } .bad .dot { background: var(--bad); }
+  #title { flex: 1; font-size: 16px; font-weight: 600; }
+  #sub, #err, #testout { margin-top: 6px; color: var(--muted); font-size: 12px; word-break: break-word; }
+  #err:empty, #testout:empty { display: none; }
+  h2 { margin: 0 0 6px; font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  ul { margin: 0; padding: 0; list-style: none; }
+  li { padding: 4px 0; border-bottom: 1px solid var(--line); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  li:last-child { border-bottom: 0; }
+  .empty { color: var(--muted); font-size: 12px; }
+  input { width: 70px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); font: 12px monospace; }
+  button { font: inherit; font-size: 12px; font-weight: 600; padding: 5px 12px; border: 0; border-radius: 999px;
+           background: var(--btn-bg); color: var(--btn-fg); cursor: pointer; }
+  button.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+  footer { display: flex; justify-content: space-between; color: var(--muted); font: 11px monospace; }
+  footer span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+</style>
+</head>
+<body>
+  <header><img src="icons/48.png" alt=""><h1>Social Publish MCP</h1>
+    <button class="ghost" id="reconnect" title="Reconnect now">Reconnect</button></header>
+
+  <section class="card" id="status">
+    <div class="row"><i class="dot"></i><span id="title">…</span></div>
+    <div id="sub"></div>
+    <div id="err"></div>
+  </section>
+
+  <section class="card">
+    <h2>Active jobs</h2>
+    <ul id="tabs"></ul>
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <span style="flex:1">Server port</span>
+      <input id="port" type="number" min="1024" max="65535"><button id="save">Save</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <span style="flex:1">Self-test (blank tab, no website)</span><button id="test" class="ghost">Test</button>
+    </div>
+    <div id="testout"></div>
+  </section>
+
+  <footer><span id="meta"></span><span id="ver"></span></footer>
+  <script src="popup.js"></script>
+</body>
+</html>

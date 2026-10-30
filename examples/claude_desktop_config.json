@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "social-publish": { "command": "social-publish-mcp" }
+  }
+}
