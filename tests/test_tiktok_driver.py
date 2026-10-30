@@ -64,7 +64,7 @@ class Studio:
             ("tt:visdrop", "Everyone"),
             ("tt:ctl:AI-generated content:state", "off"),
             ("tt:ctl:Comment:state", "on"),
-            ("tt:tz", [120, "Africa/Cairo"]),
+            ("tt:tz", [[120, "Africa/Cairo"]]),  # one answer that is a list (a bare list = a sequence of answers)
             ("tt:schedchecked", False),
             ("tt:pickertext:date", lambda _js: self.date),
             ("tt:pickertext:time", lambda _js: self.time_text()),
