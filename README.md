@@ -25,8 +25,44 @@ and it opens YouTube Studio, TikTok Studio and Meta Business Suite in your own C
 title, description, hashtags, playlists and schedule exactly like you would, and reports back the scheduled time and
 the video link.
 
+## ⚡ Quick install
+
+**Option A: let your AI agent install it.** Paste this into Claude Code, Cursor, Codex, Gemini CLI, Windsurf, VS Code
+or any agent that can run commands:
+
+```text
+Install Social Publish MCP for me by following https://github.com/h4775346/social-publish-mcp/blob/main/docs/AGENT_INSTALL.md
+```
+
+**Option B: one command.**
+
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/h4775346/social-publish-mcp/main/install.ps1 | iex
+```
+```bash
+# macOS / Linux
+curl -LsSf https://raw.githubusercontent.com/h4775346/social-publish-mcp/main/install.sh | sh
+```
+
+Either way, everything is set up for you:
+- **uv:** installed if missing.
+- **Server:** installed as the `social-publish-mcp` command.
+- **Chrome extension:** copied to `~/.social-publish-mcp/extension`.
+- **Agent skill:** installed for Claude Code.
+- **MCP registration:** in every AI client found on your computer (Claude Code, Claude Desktop, Cursor, Windsurf,
+  VS Code, Gemini CLI, Codex).
+
+**The only thing left for you** (Chrome allows extensions only by hand). The installer has already opened the page
+and the folder:
+
+1. In `chrome://extensions`, turn on **Developer mode**.
+2. Click **Load unpacked**, choose `~/.social-publish-mcp/extension`.
+3. Restart your AI client and ask it: *"check my social accounts"*.
+
 ## Contents
 
+- [Quick install](#-quick-install)
 - [Features](#features)
 - [Why not the official APIs?](#why-not-the-official-apis)
 - [How it works](#how-it-works)
@@ -156,13 +192,26 @@ uv tool upgrade social-publish-mcp
 ```
 </details>
 
+Then let it set up the extension folder, the skill and your AI clients in one go:
+
+```bash
+social-publish-mcp setup                      # every client found on this computer
+social-publish-mcp setup --client cursor      # or only the ones you name (repeatable)
+```
+
+| `setup` option | Effect |
+|---|---|
+| `--client NAME` | configure only these clients: `claude-code`, `claude-desktop`, `cursor`, `windsurf`, `vscode`, `gemini`, `codex` |
+| `--no-skill` | do not install the Claude Code skill |
+| `--no-extension` | do not copy the extension folder |
+| `--no-open` | do not open `chrome://extensions` and the extension folder |
+
+Config files are merged (your other MCP servers are kept) and backed up as `*.bak` first.
+
 ### 2. Load the Chrome extension
 
-1. Get the `extension/` folder:
-   ```bash
-   git clone https://github.com/h4775346/social-publish-mcp.git
-   ```
-   (or download the repository ZIP from GitHub and extract it).
+1. `social-publish-mcp setup` copies the extension to **`~/.social-publish-mcp/extension`**
+   (Windows: `C:\Users\<you>\.social-publish-mcp\extension`). You can also use the `extension/` folder of a clone.
 2. Open **`chrome://extensions`** (Edge: `edge://extensions`, Brave: `brave://extensions`).
 3. Turn on **Developer mode** (top right).
 4. Click **Load unpacked** and select the **`extension`** folder of the repository.
@@ -204,6 +253,9 @@ The command starts the bridge, waits for the extension, opens each upload page i
 ```
 
 ## Connect your AI agent
+
+`social-publish-mcp setup` does this automatically for Claude Code, Claude Desktop, Cursor, Windsurf, VS Code,
+Gemini CLI and Codex. The snippets below are for doing it by hand, or for other clients.
 
 Every client below starts the same stdio server. If you installed with `uv tool install`, the command is simply
 `social-publish-mcp`. If you prefer not to install, replace it with
@@ -452,6 +504,7 @@ Everything the agent can do is also available from a terminal:
 
 ```bash
 social-publish-mcp                                 # MCP server on stdio (what agents launch)
+social-publish-mcp setup [--client NAME] [--no-open]   # install extension + skill, register AI clients
 social-publish-mcp --check [--platforms youtube,tiktok]
 social-publish-mcp status
 social-publish-mcp history -n 20

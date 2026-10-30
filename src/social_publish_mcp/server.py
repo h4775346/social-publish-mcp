@@ -272,6 +272,14 @@ def _parser() -> argparse.ArgumentParser:
     b.add_argument("--dry-run", action="store_true")
     b.add_argument("--keep-tab", action="store_true")
 
+    st = sub.add_parser("setup", help="install the extension folder and the skill, and register the server in your AI clients")
+    st.add_argument("--client", action="append", metavar="NAME",
+                    help="client to configure (repeatable; default: every client found). "
+                         "One of: claude-code, claude-desktop, cursor, windsurf, vscode, gemini, codex")
+    st.add_argument("--no-skill", action="store_true", help="do not install the Claude Code skill")
+    st.add_argument("--no-extension", action="store_true", help="do not copy the extension folder")
+    st.add_argument("--no-open", action="store_true", help="do not open chrome://extensions and the extension folder")
+
     sub.add_parser("status", help="extension connection and running jobs")
     h = sub.add_parser("history", help="last results")
     h.add_argument("-n", type=int, default=20)
@@ -334,6 +342,10 @@ def main(argv: list[str] | None = None) -> None:
     if a.version:
         print(f"social-publish-mcp {__version__}")
         return
+    if a.cmd == "setup":
+        from .setup import run_setup
+        sys.exit(run_setup(client_names=a.client, skill=not a.no_skill, extension=not a.no_extension,
+                           open_pages=not a.no_open))
     if a.check or a.cmd:
         # account names and captions are often non-Latin; Windows consoles default to cp1252
         for stream in (sys.stdout, sys.stderr):

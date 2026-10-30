@@ -3,6 +3,16 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-10-31
+
+### Added
+- One-line installers: `install.ps1` (Windows) and `install.sh` (macOS/Linux).
+- `social-publish-mcp setup`: copies the Chrome extension to `~/.social-publish-mcp/extension`, installs the Claude Code
+  skill and registers the MCP server in Claude Code, Claude Desktop, Cursor, Windsurf, VS Code, Gemini CLI and Codex
+  (configs merged and backed up); opens `chrome://extensions` and the extension folder.
+- `docs/AGENT_INSTALL.md`: install instructions an AI agent can follow end to end.
+- The extension and the skill now ship inside the Python package.
+
 ## [0.1.0] - 2026-10-31
 
 First public release.

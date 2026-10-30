@@ -34,6 +34,11 @@ path = "src/social_publish_mcp/__init__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["src/social_publish_mcp"]
 
+# ship the extension and the skill inside the package so `social-publish-mcp setup` works after a plain install
+[tool.hatch.build.targets.wheel.force-include]
+"extension" = "social_publish_mcp/extension"
+"skill" = "social_publish_mcp/skill"
+
 [tool.hatch.build.targets.sdist]
 include = ["src", "tests", "extension", "skill", "README.md", "LICENSE", "CHANGELOG.md"]
 
