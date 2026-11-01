@@ -50,6 +50,7 @@ _KEYS: dict[str, tuple[str, int]] = {  # key -> (code, windowsVirtualKeyCode)
     "Enter": ("Enter", 13), "Escape": ("Escape", 27), "Backspace": ("Backspace", 8), "Delete": ("Delete", 46),
     "Tab": ("Tab", 9), "ArrowDown": ("ArrowDown", 40), "ArrowUp": ("ArrowUp", 38), "ArrowLeft": ("ArrowLeft", 37),
     "ArrowRight": ("ArrowRight", 39), "Home": ("Home", 36), "End": ("End", 35), "a": ("KeyA", 65), " ": ("Space", 32),
+    ",": ("Comma", 188), "/": ("Slash", 191),
 }
 _MODS = {"alt": 1, "ctrl": 2, "meta": 4, "shift": 8}
 

@@ -486,6 +486,47 @@ def _parse_time(s: str) -> tuple[int, int] | None:
     return h, mi
 
 
+DATE_TRIES = 3
+
+
+def date_entry_plan(date_s: str, attempt: int) -> list[tuple[str, ...]]:
+    """Input sequence for one try at the date field (after a real click on it): select all, the date, commit.
+
+    Try 0 is what worked live (ctrl+a, insertText mm/dd/yyyy, Enter); later tries also press Tab to blur/commit,
+    and the last one types the date as key events (for a masked input that ignores insertText)."""
+    typed: tuple[str, ...] = ("keys", date_s) if attempt >= 2 else ("text", date_s)
+    ops: list[tuple[str, ...]] = [("key", "a", "ctrl"), typed, ("key", "Enter")]
+    if attempt >= 1:
+        ops.append(("key", "Tab"))
+    return ops
+
+
+async def _enter_date(page: Page, local: datetime, date_s: str) -> str:
+    """Set the date field and read it back; up to DATE_TRIES tries.
+
+    2026-11-01: one job left the field at its default ("Nov 1, 2026", wanted 11/02/2026) while a TikTok job in the
+    same window was bringing its own tab to the front; the retry minutes later worked. So: bring this tab to the
+    front, real click, select all, type, commit, re-read; retry with a short pause."""
+    want = (local.year, local.month, local.day)
+    shown = ""
+    for attempt in range(DATE_TRIES):
+        await page.bring_to_front()
+        await page.click(DATE_INPUT)
+        for op in date_entry_plan(date_s, attempt):
+            if op[0] == "text":
+                await page.insert_text(op[1])
+            elif op[0] == "keys":
+                await page.type_keys(op[1])
+            else:
+                await page.press(op[1], *op[2:])
+        await _sleep(0.6)
+        shown = await page.eval(DATE_VALUE_JS) or ""
+        if _parse_date(shown) == want:
+            return shown
+        await _sleep(0.8 * (attempt + 1))
+    raise DriverError("schedule", f"date shows {shown!r}, wanted {date_s} (after {DATE_TRIES} tries)")
+
+
 async def _schedule(page: Page, when: datetime) -> str:
     # The UI shows times in the browser/account zone; ask the browser for its offset at that exact instant.
     offset = await page.eval(f"new Date({int(when.timestamp() * 1000)}).getTimezoneOffset()/*fb:tzoffset*/")
@@ -511,14 +552,10 @@ async def _schedule(page: Page, when: datetime) -> str:
     except PageError as e:
         raise DriverError("schedule", "no date input after opening 'Scheduling options' (UNVERIFIED selector)") from e
 
-    # Date: real click, ctrl+a, type mm/dd/yyyy, Enter (worked in Meta's reschedule dialog).
-    await page.click(DATE_INPUT)
-    await page.press("a", "ctrl")
-    await page.insert_text(date_s)
-    await page.press("Enter")
-    await _sleep(0.5)
+    await _enter_date(page, local, date_s)
 
     # Time: a single text input, or hour/minute/meridiem spinbuttons.  # UNVERIFIED either way
+    await page.bring_to_front()
     if await page.exists(TIME_INPUT):
         await page.click(TIME_INPUT)
         await page.press("a", "ctrl")
@@ -547,9 +584,9 @@ async def _schedule(page: Page, when: datetime) -> str:
     await _sleep(0.5)
 
     shown_date = await page.eval(DATE_VALUE_JS) or ""
-    shown_time = await page.eval(TIME_VALUE_JS) or ""
     if _parse_date(shown_date) != (local.year, local.month, local.day):
-        raise DriverError("schedule", f"date shows {shown_date!r}, wanted {date_s}")
+        await _enter_date(page, local, date_s)  # the time entry must not move the date; if it did, set it again
+    shown_time = await page.eval(TIME_VALUE_JS) or ""
     if _parse_time(shown_time) != (local.hour, local.minute):
         raise DriverError("schedule", f"time shows {shown_time!r}, wanted {time_s}")
     try:

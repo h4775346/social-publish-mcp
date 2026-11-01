@@ -192,3 +192,50 @@ async def test_check_login():
     page = FakePage([("fb:login", {"url": "https://www.facebook.com/login", "loginPage": True, "bs": False})])
     r = await fb.check_login(page)
     assert r["logged_in"] is False
+
+
+# --------------------------------------------------------------------------- 2026-11-01: date entry retries
+def test_parse_date_formats():
+    assert fb._parse_date("11/02/2026") == (2026, 11, 2)
+    assert fb._parse_date("Nov 2, 2026") == (2026, 11, 2)
+    assert fb._parse_date(" Nov  1,  2026 ") == (2026, 11, 1)
+    assert fb._parse_date("Monday, November 2, 2026") == (2026, 11, 2)
+    assert fb._parse_date("2026-11-02") == (2026, 11, 2)
+    assert fb._parse_date("") is None and fb._parse_date("tomorrow") is None
+
+
+def test_date_entry_plan_escalates():
+    assert fb.date_entry_plan("11/02/2026", 0) == [("key", "a", "ctrl"), ("text", "11/02/2026"), ("key", "Enter")]
+    assert fb.date_entry_plan("11/02/2026", 1)[-1] == ("key", "Tab")
+    assert ("keys", "11/02/2026") in fb.date_entry_plan("11/02/2026", 2)
+
+
+def _sched_page(datevals):
+    when_utc = (datetime.now(timezone.utc) + timedelta(days=3)).replace(hour=16, minute=5, second=0, microsecond=0)
+    local = when_utc.astimezone(timezone(timedelta(hours=2)))
+    page = make_page(pre=[
+        ("fb:tzoffset", -120),
+        ("fb:dateval", datevals(local)),
+        ("fb:timeval", fb._fmt_time(local)),
+    ])
+    return page, when_utc, local
+
+
+async def test_schedule_date_retried_until_it_sticks():
+    # live failure: the field kept today's default; the second try works
+    page, when, local = _sched_page(lambda d: ["Nov 1, 2026", d.strftime("%b %d, %Y").replace(" 0", " "), "x"][:2])
+    res = await fb.publish(page, job(schedule_at=when), dry_run=True)
+    assert res.ok and res.scheduled_for == local.isoformat()
+    date_clicks = [c for c in page.calls if c[0] == "click" and "fb:dateinput" in str(c[1])]
+    assert len(date_clicks) == 2
+    assert page.calls.count(("bring_to_front",)) >= 2
+    assert ("press", "Tab", ()) in page.calls  # second try also blurs with Tab
+
+
+async def test_schedule_date_fails_after_three_tries():
+    page, when, _ = _sched_page(lambda d: "Nov 1, 2026")
+    with pytest.raises(DriverError) as ei:
+        await fb.publish(page, job(schedule_at=when), dry_run=True)
+    assert ei.value.step == "schedule" and "after 3 tries" in str(ei.value) and "Nov 1, 2026" in str(ei.value)
+    assert len([c for c in page.calls if c[0] == "click" and "fb:dateinput" in str(c[1])]) == 3
+    assert any(c[0] == "type_keys" and "/" in c[1] for c in page.calls)  # last try types key events

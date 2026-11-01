@@ -30,26 +30,31 @@ def _fill_echo(js: str) -> str:
 
 
 def make_page(*, existing_tags=("nilebeats",), playlists=("Arabic songs", "Shorts 2026"), tz_text="(GMT+0200) Cairo",
-              date_text="", time_value="", done_label="Publish", result=None, pre=()):
+              date_text="", time_value="", done_label="Publish", result=None, pre=(), commit_on=","):
+    """commit_on: the key that turns typed tag text into a chip ("," = comma key event, "Enter", or None = never)."""
     page = FakePage()
 
-    def typed_tags() -> list[str]:
-        typed = [c[1] for c in page.calls if c[0] == "text" and c[1].endswith(",")]
-        return [t for t in typed[-1].split(",") if t] if typed else []
+    def committed_tags() -> list[str]:
+        out, pending = [], None
+        for c in page.calls:
+            if c[0] == "text":
+                pending = c[1]
+            elif pending is not None and ((c[0] == "type_keys" and c[1] == commit_on)
+                                         or (c[0] == "press" and c[1] == commit_on)):
+                out.append(pending)
+                pending = None
+        return out
 
     def tags(_js):
-        chips = list(existing_tags) + typed_tags()
-        return {"chips": chips, "text": "\n".join(chips)}
+        chips = list(existing_tags) + committed_tags()
+        return {"chips": chips, "text": " ".join(chips)}
 
     def clicked_box(name: str) -> bool:
-        return any(c[0] == "click" and isinstance(c[1], str) and "yt:pl-box" in c[1] and json.dumps(name) in c[1]
-                   for c in page.calls)
+        return any(c[0] == "click" and isinstance(c[1], str) and "yt:pl-box" in c[1]
+                   and c[1].endswith(f"({json.dumps(name, ensure_ascii=False)})") for c in page.calls)
 
-    def box_name(js: str) -> str:
-        return json.loads(re.search(r"\}\)\((\".*?\")\)", js).group(1))
-
-    def checked(js):
-        return clicked_box(box_name(js)) if "yt:pl-box" in js else True
+    def arg_name(js: str) -> str:
+        return json.loads(re.search(r"\}\)\((\".*\")\)$", js, re.S).group(1))
 
     def pl_text(_js):
         names = [n for n in playlists if clicked_box(n)]
@@ -59,20 +64,24 @@ def make_page(*, existing_tags=("nilebeats",), playlists=("Arabic songs", "Short
         ("yt:dialog", "ok"),
         ("yt:fill", _fill_echo),
         ("yt:visible", False),
+        ("yt:tag-input", ""),
         ("yt:tags", tags),
-        ("yt:pl-names", list(playlists)),
-        ("yt:checked", checked),
-        ("yt:pl-box", lambda js: box_name(js) in playlists),
+        ("yt:popup", None),
+        ("yt:neutral", None),
+        ("yt:pl-items", {"names": list(playlists), "checked": [], "empty": False}),
+        ("yt:pl-checked", lambda js: clicked_box(arg_name(js))),
+        ("yt:checked", True),
+        ("yt:pl-box", lambda js: arg_name(js) in playlists),
         ("yt:pl-text", pl_text),
-        ("yt:links", [SHORT]),
+        ("yt:links", [[SHORT]]),  # one list per call (a bare list is a call sequence)
         ("yt:tz", tz_text),
         ("yt:date-text", date_text),
         ("yt:time-value", time_value),
         ("yt:time-fill", time_value),
         ("yt:upload", "done"),
         ("yt:progress", "Uploading 40% ..."),
-        ("#done-button", done_label),
-        ("yt:result", result or {"heading": "Video published", "text": "Video published\n" + SHORT, "links": [SHORT]}),
+        ("yt:done-state", {"label": done_label, "visible": True, "enabled": True}),
+        ("yt:result", result or {"heading": "Video published", "text": "Video published " + SHORT, "links": [SHORT]}),
     ]
     return page
 
@@ -103,7 +112,7 @@ def test_title_fallback_and_truncation():
 
 
 def test_tag_dedup_and_budget():
-    assert yt.plan_tags(["NileBeats"], ["nilebeats", "#Arabic", "arabic", "a,b", " "]) == ["Arabic", "a b"]
+    assert yt.plan_tags(["NileBeats"], ["nilebeats", "#Arabic", "arabic", "a,b", " "]) == ["Arabic", "a", "b"]
     # budget: existing 'x'*490 (490) + ',' + 'abc' (3) = 494; 'with space' costs 10+2+1 > 6 left -> skipped; 'de' fits
     assert yt.plan_tags(["x" * 490], ["abc", "with space", "de"]) == ["abc", "de"]
     assert yt.plan_tags([], ["y" * 501]) == []
@@ -151,7 +160,10 @@ async def test_publish_now_step_order():
     assert fills == ["Habibi ya Nour", "حبيبي يا نور العين ❤️\nNew song #NileBeats"]
 
     typed = [c[1] for c in page.calls if c[0] == "text"]
-    assert typed == ["arabic pop,egypt,"]  # 'NileBeats' already present as 'nilebeats'
+    assert typed == ["arabic pop", "egypt"]  # one tag at a time; 'NileBeats' already present as 'nilebeats'
+    keys = [c for c in page.calls if c[0] in ("text", "type_keys")]
+    assert keys == [("text", "arabic pop"), ("type_keys", ","), ("text", "egypt"), ("type_keys", ",")]
+    assert "tags not committed" not in r.message
 
     cl = clicks(page)
     order = [
@@ -265,3 +277,154 @@ async def test_check_login_states():
 
     stuck = await yt.check_login(FakePage([("yt:login", None)]))
     assert not stuck["logged_in"]
+
+
+# --------------------------------------------------------------------------- 2026-11-01 fixes
+OPETO_SHORTS = "OPETO Shorts · شورتس أغاني أوبيتو | Arabic Song Shorts"
+ALTERED = ["Make a real person appear to say or do something they didn’t say or do",
+           "Alter footage of a real event or place"]
+
+
+def test_split_tags_handles_commas_and_arabic_comma():
+    assert yt.split_tags(["رونالدو,كريستيانو رونالدو", "الدون، أهداف رونالدو", " #شورتس ", ""]) == [
+        "رونالدو", "كريستيانو رونالدو", "الدون", "أهداف رونالدو", "شورتس"]
+    assert yt.split_tags("a, b ,,c") == ["a", "b", "c"]
+    assert yt.plan_tags([], "x،y") == ["x", "y"]
+
+
+def test_tag_committed_needs_an_exact_chip():
+    assert yt.tag_committed("Arabic Pop", ["arabic  pop"])
+    merged = "رونالدو,كريستيانو رونالدو,الدون"
+    assert not yt.tag_committed("رونالدو", [merged])
+    assert yt.tag_committed("الدون", ["OPETO", "الدون"])
+
+
+def test_match_playlist_prefix_contains_and_ambiguity():
+    names = ["Arabic songs", OPETO_SHORTS, "OPETO Music videos"]
+    assert yt.match_playlist("OPETO Shorts", names) == 1
+    assert yt.match_playlist("opeto shorts", names) == 1  # case-insensitive
+    assert yt.match_playlist("Arabic Song Shorts", names) == 1  # contains
+    assert yt.match_playlist("arabic songs", names) == 0  # exact beats the contains-hit in row 1
+    assert yt.match_playlist("Nope", names) is None
+    assert yt.match_playlist("", names) is None
+    with pytest.raises(yt.AmbiguousPlaylist):
+        yt.match_playlist("OPETO", names)
+
+
+def test_extract_video_prefers_shorts_link():
+    assert yt.extract_video(["https://youtu.be/AbCdEfGhIj0", SHORT]) == (SHORT, "AbCdEfGhIj0")
+    assert yt.extract_video(["https://studio.youtube.com/video/x/edit"]) == ("", "")
+
+
+async def test_playlist_matched_by_prefix_in_picker_only():
+    page = make_page(playlists=("Arabic songs", OPETO_SHORTS))
+    r = await yt.publish(page, job(options={"playlists": ["OPETO Shorts"]}))
+    assert r.ok
+    boxes = [s for s in clicks(page) if "yt:pl-box" in s]
+    assert len(boxes) == 1 and boxes[0].endswith(f"({json.dumps(OPETO_SHORTS, ensure_ascii=False)})")
+    assert OPETO_SHORTS in r.message
+    # rows come from the picker popup (yt:pl-items), never from generic <li>s of the upload dialog
+    items = next(c[1] for c in page.calls if "yt:pl-items" in str(c[1]))
+    assert "ytcp-playlist-dialog" in items and "Create playlist" in items and "tp-yt-paper-dialog li" not in items
+
+
+async def test_playlist_waits_for_loading_list():
+    loading = {"names": [], "checked": [], "empty": True}
+    page = make_page(pre=[("yt:pl-items", [loading, loading, {"names": ["Shorts 2026"], "checked": [], "empty": False}])])
+    r = await yt.publish(page, job())
+    assert r.ok and any("yt:pl-box" in s for s in clicks(page))
+
+
+async def test_playlist_picker_never_loads_fails_clearly():
+    page = make_page(pre=[("yt:pl-items", {"names": [], "checked": [], "empty": True})])
+    with pytest.raises(DriverError) as e:
+        await yt.publish(page, job())
+    assert e.value.step == "playlists" and "No playlists available" in str(e.value)
+    assert yt.DONE not in clicks(page)
+
+
+async def test_playlist_not_found_lists_picker_rows():
+    page = make_page(playlists=("Arabic songs", OPETO_SHORTS))
+    with pytest.raises(DriverError) as e:
+        await yt.publish(page, job(options={"playlists": ["Nope"]}))
+    assert OPETO_SHORTS in str(e.value) and ALTERED[0] not in str(e.value)
+
+
+async def test_tags_uncommitted_are_a_warning_not_a_failure():
+    page = make_page(commit_on=None, pre=[("yt:tag-input", "رونالدو")])
+    r = await yt.publish(page, job(tags=["رونالدو", "الدون"]))
+    assert r.ok and r.status == "published"
+    assert "tags not committed: ['رونالدو', 'الدون']" in r.message
+    presses = [c for c in page.calls if c[0] == "press"]
+    assert ("press", "Enter", ()) in presses  # fallback after the comma key
+    assert presses.count(("press", "Backspace", ())) == 2  # leftover text cleared before the next tag
+
+
+async def test_tags_committed_with_enter_fallback():
+    page = make_page(commit_on="Enter", pre=[("yt:tag-input", ["رونالدو", "", "الدون", ""])])
+    r = await yt.publish(page, job(tags=["رونالدو", "الدون"]))
+    assert r.ok and "tags not committed" not in r.message
+
+
+async def test_open_time_list_is_closed_before_final_click():
+    when = datetime(2030, 6, 10, 15, 0, tzinfo=timezone.utc)
+    text = "Video scheduled\nYour video will be set to public on Jun 10, 2030 at 5:00 PM\n" + SHORT
+    page = make_page(date_text="Jun 10, 2030", time_value="5:00 PM", done_label="Schedule",
+                     result={"heading": "Video scheduled", "text": text, "links": [SHORT]},
+                     pre=[("yt:popup", [["12:00 AM / 12:15 AM"], None])])
+    r = await yt.publish(page, job(schedule_at=when))
+    assert r.status == "scheduled" and r.url == SHORT and r.post_id == "AbCdEfGhIj0"
+    assert "video id AbCdEfGhIj0" in r.message
+    cl = clicks(page)
+    assert cl.index(yt.NEUTRAL) < cl.index(yt.DONE)
+    assert cl.count(yt.DONE) == 1
+    assert ("bring_to_front",) in page.calls
+
+
+async def test_escape_when_neutral_click_does_not_close_the_list():
+    when = datetime(2030, 6, 10, 15, 0, tzinfo=timezone.utc)
+    page = make_page(date_text="Jun 10, 2030", time_value="5:00 PM", done_label="Schedule",
+                     pre=[("yt:popup", [["list"], ["list"], None])])
+    await yt.publish(page, job(schedule_at=when), dry_run=True)
+    assert ("press", "Escape", ()) in page.calls
+
+
+async def test_final_click_waits_until_enabled():
+    off = {"label": "Publish", "visible": True, "enabled": False}
+    on = {"label": "Publish", "visible": True, "enabled": True}
+    page = make_page(pre=[("yt:done-state", [off, off, on])])
+    r = await yt.publish(page, job())
+    assert r.ok
+    states = [i for i, c in enumerate(page.calls) if len(c) > 1 and "yt:done-state" in str(c[1])]
+    assert len(states) >= 3 and states[2] < page.calls.index(("click", yt.DONE))
+
+
+async def test_swallowed_final_click_is_retried():
+    ok = {"heading": "Video published", "text": "Video published", "links": [SHORT]}
+    page = make_page(pre=[("yt:result", [None] * yt.RECLICK_EVERY + [ok])])
+    r = await yt.publish(page, job())
+    assert r.ok and r.url == SHORT
+    assert clicks(page).count(yt.DONE) == 2
+
+
+async def test_result_timeout_reports_clicks_and_state():
+    page = make_page(pre=[("yt:result", None)])
+    with pytest.raises(DriverError) as e:
+        await yt.publish(page, job())
+    assert e.value.step == "result" and f"{yt.FINAL_CLICKS} click(s)" in str(e.value)
+    assert clicks(page).count(yt.DONE) == yt.FINAL_CLICKS
+    assert e.value.screenshot
+
+
+async def test_result_link_falls_back_to_details_link():
+    page = make_page(result={"heading": "Video published", "text": "Video published", "links": []})
+    r = await yt.publish(page, job())
+    assert r.url == SHORT and r.post_id == "AbCdEfGhIj0"
+
+
+async def test_result_dom_dump_written_on_failure(tmp_path):
+    page = make_page(pre=[("yt:result", None), ("yt:dom-dump", {"url": "x", "dialogs": []})])
+    page.artifacts_dir = tmp_path
+    with pytest.raises(DriverError) as e:
+        await yt.publish(page, job())
+    assert "dom dump:" in str(e.value) and (tmp_path / "youtube_result_dom.json").exists()

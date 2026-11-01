@@ -18,7 +18,7 @@ class PostJob:
     title: YouTube title (other platforms ignore it; put everything they need in caption).
     caption: YouTube description / Facebook reel description / TikTok caption (hashtags included, written as-is).
     options (per platform, all optional):
-      youtube:  channel_id (str, required for multi-channel accounts), playlists (list[str], exact names),
+      youtube:  channel_id (str, required for multi-channel accounts), playlists (list[str], name or unique prefix),
                 made_for_kids (bool, default False), altered_content (bool, default False),
                 visibility ("public" | "unlisted" | "private", default "public")
       facebook: asset_id (Meta Business Suite page asset id), allow_remix (bool, default True)

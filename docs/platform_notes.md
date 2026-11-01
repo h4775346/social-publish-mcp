@@ -19,25 +19,42 @@ times in the account's zone; YouTube and TikTok showed Cairo GMT+2 for the test 
 - Made for kids: `tp-yt-paper-radio-button[name="VIDEO_MADE_FOR_KIDS_NOT_MFK"]` / `..._MFK`.
 - "Show more": `ytcp-uploads-dialog #toggle-button`. Then altered/synthetic content:
   `tp-yt-paper-radio-button[name="VIDEO_HAS_ALTERED_CONTENT_YES"]` / `_NO`.
-- Tags: input `ytcp-uploads-dialog #tags-container input#text-input`; focus it and type `tag1,tag2,` (each comma
-  commits a tag; trusted typing needed — Input.insertText of the whole string worked). Channel default tags may
-  already be present (500 char limit total).
-- Playlists: `ytcp-video-metadata-playlists` → click its `ytcp-dropdown-trigger`; a list of checkboxes opens
-  (order = most recently used first). JS `.click()` on rows toggles twice (li + label) → use a trusted click on the
-  checkbox element of the row whose text starts with the playlist name, then click the "Done" button. Verify with
+- Tags: input `ytcp-uploads-dialog #tags-container input#text-input` (hint under it: "Enter a comma after each tag").
+  Commit ONE tag at a time: insertText the tag, then a comma as its own key event (keyDown with text ","); Enter is
+  the fallback. Inserting `tag1,tag2,` as one Input.insertText does NOT split: on 2026-11-01 the Arabic tags stayed one
+  uncommitted string `رونالدو,كريستيانو رونالدو,الدون,أ…` in the input. Verify by exact chip text (a merged chip
+  does not count). Never Backspace in an empty tag input (deletes the last chip). Channel default tags may already be
+  present (500 char limit total). The driver treats tag problems as a warning in the result message, not a failure.
+- Playlists: `ytcp-video-metadata-playlists` → click its `ytcp-dropdown-trigger`; a popup opens with a checkbox list
+  (order = most recently used first) and "Create playlist" + "Done" at the bottom. It first shows
+  "No playlists available" while the list loads (2026-11-01 screenshot) → wait for rows. Scope every row lookup to
+  that popup: the upload dialog has other `<li>`s (the altered-content examples "Make a real person appear…",
+  "Alter footage…") that a generic `tp-yt-paper-dialog li` selector picks up instead (the 2026-11-01 "playlist
+  not found" bug). Real names are long (`OPETO Shorts · شورتس أغاني أوبيتو | Arabic Song Shorts`): match the
+  given name exact → prefix → contains, case-insensitive; several hits = ambiguous → error. JS `.click()` on rows
+  toggles twice (li + label) → trusted click on the row's checkbox, then "Done". Verify with
   `ytcp-video-metadata-playlists` innerText (shows the selected playlist name, or "Select").
-  A hashtag-suggestion popup from the title field can cover the list: click an empty area first.
+  A hashtag-suggestion popup from the title field can cover the list: close open dropdowns first.
 - Steps: `ytcp-uploads-dialog #next-button` ×3 → Visibility step.
 - Publish now: `tp-yt-paper-radio-button[name="PUBLIC"]` (also UNLISTED / PRIVATE) then `#done-button` (label "Publish").
 - Schedule: `ytcp-uploads-dialog #second-container-expand-button`, then `#datepicker-trigger` opens a calendar list;
   the date must be picked with a trusted click on the day cell (typing into the date input mixes date+time).
   Time: the `ytcp-datetime-picker input` whose value matches /AM|PM/ — focus (trusted click), select, then
-  `execCommand('insertText', false, '5:00 PM')` + dispatch `change` + blur; close the list by clicking elsewhere.
+  `execCommand('insertText', false, '5:00 PM')` + dispatch `change` + blur. The click opens a time list
+  (a `tp-yt-iron-dropdown`, "12:00 AM, 12:15 AM, …") that STAYS OPEN after typing (2026-11-01 dry-run screenshot).
+  It must be closed before the final click: an open dropdown swallows the next click (it only closes the list).
+  Close it with a click on plain text of the step ("Before you publish, check the following:"), else Escape (Polymer
+  sends Escape to the topmost overlay only, i.e. the dropdown), and re-check that no iron-dropdown is visible.
   Then `#done-button` (label "Schedule").
 - Checks: footer text "Checks complete. No issues found." Upload progress text: "Uploading 14% …",
   "Upload complete … Processing will begin shortly". You can publish/schedule before processing finishes.
-- Result dialog: "Video published" or "Video scheduled" with "Your video will be set to public on <date> at <time>";
-  the share link `https://youtube.com/shorts/<ID>` (or watch URL) is inside it (anchor href / text).
+- Result dialog: "Video published" or "Video scheduled" with "Your video will be set to public on <date> at <time>",
+  the share link `https://youtube.com/shorts/<ID>` (or watch URL) and a Close button; appears ~5-10 s after the
+  click (verified by hand 2026-11-01). Find it by the heading text itself (it may sit inside `ytcp-uploads-dialog`),
+  not by a fixed container list. The "Video link" shown on the Details step is the same URL (fallback).
+- Final click: wait until `#done-button` is visible and enabled (`disabled` / `aria-disabled`), close open dropdowns,
+  bring the tab to the front, click. If neither the result dialog appears nor the button changes within ~12 s,
+  the click was swallowed → close popups and click again (max 3 clicks). On timeout dump the DOM.
 - Gotcha: the MCP extension's own file_upload (10 MB) and Chrome's native file dialog are both unusable; setFileInputFiles
   via CDP is the right path.
 
@@ -93,7 +110,10 @@ Facebook reels composer
   `DOM.setFileInputFiles` on it (fires change; upload starts). Restore the prototype afterwards.
 - Share step: card "Scheduling options" with a segmented control **Share now | Schedule | Save as draft**
   (role=button each). After "Schedule": text "Select a future date and time to publish your reel at.", a date input
-  (placeholder `mm/dd/yyyy`, shows "Oct 31, 2026"; ctrl+a + type mm/dd/yyyy + Enter works) and three spinbutton
+  (placeholder `mm/dd/yyyy`, shows "Oct 31, 2026"; ctrl+a + type mm/dd/yyyy + Enter works — but not always: on
+  2026-11-01 one job kept the default "Nov 1, 2026" while parallel jobs (TikTok, YouTube) were bringing their own tabs
+  to the front; a retry minutes later worked. The driver now brings the tab to the front, real-clicks the field,
+  ctrl+a, types, Enter (+Tab on retries, key events on the last try), re-reads, up to 3 tries) and three spinbutton
   inputs aria-label `hours` / `minutes` / `meridiem` that take key events (not insertText) and keep an empty `.value`;
   the chosen time is drawn as text beside them ("05:00 PM Africa/Cairo"). The footer button changes to "Schedule".
   Also on the Share step: "Active times" button, switches Add to playlist / Share to Facebook Story / Share to groups /
@@ -108,3 +128,23 @@ TikTok Studio
   works: `document.elementFromPoint` at the item centre.
 - Calendar: `span.day` (`valid` = selectable, `selected`), month arrows `span.arrow` (second = next).
 - The page shows the picker zone ("Africa/Cairo UTC+0200").
+
+## Live batch 2026-11-01 (OPETO-X Shorts): failures and what the drivers do now
+
+Evidence: `~/.social-publish-mcp/artifacts/<job_id>/` screenshots and DOM dumps, `history.jsonl`.
+
+- YouTube final step: every real job ended "timeout after 90s waiting for 'Video published/scheduled' dialog" with the
+  dialog still on Visibility, Schedule set, "Checks complete", button "Schedule" enabled. The dry-run screenshot of
+  the same flow shows the schedule time list still open. Cause: the open time dropdown swallowed the single trusted
+  click on "Schedule" (the old neutral click on `#dialog-title`, a GUESS selector, did not close it). Fix: close
+  dropdowns (verified closed) after typing the time and before the click, wait for the button to be enabled, re-click
+  if nothing happens, detect the result by heading, dump the DOM on timeout. UNVERIFIED live: the iron-dropdown
+  detection and the neutral-text click on the real Studio DOM.
+- YouTube playlists: picker rows were read with `tp-yt-paper-dialog li`, which matched the altered-content `<li>`s of
+  the upload dialog while the picker still showed "No playlists available". Fix: scope to the picker popup, wait for
+  rows, prefix/contains match. UNVERIFIED live: the picker's element names (found by tag `ytcp-playlist-dialog`, else
+  by climbing from "Create playlist" to the ancestor with "Done") and the row label element.
+- YouTube tags: comma-joined insertText was not split into chips (Arabic). Fix: one tag + comma key event each,
+  Enter fallback, verify exact chips, warning instead of failure. UNVERIFIED live: that the comma key event commits
+  (Studio's hint says "Enter a comma after each tag"); `ytcp-chip, ytcp-free-text-chip` chip selector is still a GUESS.
+- Facebook date: see the Business Suite notes above (3 tries with read-back).

@@ -487,7 +487,7 @@ Each result:
 | Platform | Option | Default | Meaning |
 |---|---|---|---|
 | youtube | `channel_id` | — | Channel to upload to (`UC…`); required when the account owns several channels |
-| | `playlists` | `[]` | Exact playlist names to add the video to |
+| | `playlists` | `[]` | Playlists to add the video to: the full name or a unique start/part of it, case-insensitive (`"OPETO Shorts"` finds `"OPETO Shorts · …"`) |
 | | `visibility` | `public` | `public` · `unlisted` · `private` (scheduled videos are always public) |
 | | `made_for_kids` | `false` | Audience setting |
 | | `altered_content` | `false` | "Altered or synthetic content" disclosure |

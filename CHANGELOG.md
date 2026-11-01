@@ -3,6 +3,23 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- YouTube: real (non-dry) jobs timed out waiting for the "Video scheduled/published" dialog. The schedule time list
+  stayed open after the time was typed and swallowed the click on "Schedule". Open dropdowns are now closed and
+  checked before the final click, the driver waits for the button to be enabled, re-clicks (max 3) when nothing
+  reacts, finds the result dialog by its heading ("Video scheduled" / "Video published") wherever it is in the DOM,
+  and writes `youtube_<step>_dom.json` on failure. Results carry the Shorts URL and the video id (`post_id`).
+- YouTube playlists: names were read from the altered-content checkboxes instead of the playlist picker. The picker
+  popup is now found on its own, the driver waits for its list to load, and `playlists` accepts the full name or a
+  unique case-insensitive start/part of it (`"OPETO Shorts"` finds `"OPETO Shorts · …"`); ambiguous names fail clearly.
+- YouTube tags: tags are committed one chip at a time (tag, then a comma key event; Enter as fallback) and verified
+  by exact chip text; Arabic tags no longer merge into one string. Commas, including the Arabic comma `،`, split tags.
+  A tag that does not commit is a warning in the result message, not a job failure.
+- Facebook schedule date: the date is entered up to 3 times (tab brought to front, real click, select all, type,
+  Enter, Tab on retries, key events on the last try) and read back each time; the date is re-checked after the time.
+
 ## [0.2.0] - 2026-10-31
 
 ### Added

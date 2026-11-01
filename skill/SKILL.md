@@ -23,7 +23,7 @@ that posts. Every post is public and permanent, so the rules below are not optio
 `caption` is the YouTube description / Facebook reel description / TikTok caption, hashtags included, posted as
 written. `title` is YouTube only (required there, ≤100 chars). Options:
 
-- youtube: `channel_id` (needed when the Google account owns several channels), `playlists` (exact names),
+- youtube: `channel_id` (needed when the Google account owns several channels), `playlists` (full name or a unique start of it),
   `made_for_kids` (default false), `altered_content` (default false), `visibility` public|unlisted|private
 - facebook: `asset_id` (the Page's Business Suite asset id), `allow_remix` (default true)
 - tiktok: `visibility` everyone|friends|only_me, `ai_generated` (default false), `allow_comments` (default true)
