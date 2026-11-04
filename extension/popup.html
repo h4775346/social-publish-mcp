@@ -31,6 +31,24 @@
   li { padding: 4px 0; border-bottom: 1px solid var(--line); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   li:last-child { border-bottom: 0; }
   .empty { color: var(--muted); font-size: 12px; }
+  #browsers { display: grid; gap: 8px; }
+  .br { padding: 9px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); }
+  .br.me { border-color: var(--fg); }
+  .br .top { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .br .name { flex: 1; min-width: 0; font-weight: 600; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .br input.name { width: auto; padding: 0 0 1px; border: 0; border-bottom: 1px dashed var(--line); border-radius: 0; background: transparent; font: 600 12.5px "Segoe UI", system-ui, sans-serif; }
+  .br .who { margin-top: 2px; color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tag { flex: none; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; color: var(--muted); border: 1px solid var(--line); }
+  .tag.live { color: var(--ok); border-color: var(--ok); }
+  .plats { display: flex; gap: 5px; margin-top: 7px; }
+  .plat { flex: 1; padding: 3px 0; border-radius: 7px; font-size: 11px; font-weight: 600; background: transparent; color: var(--muted); border: 1px solid var(--line); }
+  .plat.on { background: var(--btn-bg); color: var(--btn-fg); border-color: var(--btn-bg); }
+  .plat .ok { color: var(--ok); }
+  .plat:disabled { opacity: .5; cursor: default; }
+  #pick { margin: 0 0 8px; padding: 7px 9px; border-radius: 8px; font-size: 12px; border: 1px solid var(--warn); color: var(--warn); }
+  #pick:empty { display: none; }
+  .h2row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .h2row h2 { margin: 0; }
   input { width: 70px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); font: 12px monospace; }
   button { font: inherit; font-size: 12px; font-weight: 600; padding: 5px 12px; border: 0; border-radius: 999px;
            background: var(--btn-bg); color: var(--btn-fg); cursor: pointer; }
@@ -47,6 +65,12 @@
     <div class="row"><i class="dot"></i><span id="title">…</span></div>
     <div id="sub"></div>
     <div id="err"></div>
+  </section>
+
+  <section class="card">
+    <div class="h2row"><h2>Browsers</h2><button class="ghost" id="scan" title="Open each platform in each browser and see who is logged in">Scan accounts</button></div>
+    <div id="pick"></div>
+    <div id="browsers"></div>
   </section>
 
   <section class="card">

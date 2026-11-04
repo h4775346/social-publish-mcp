@@ -449,6 +449,8 @@ before posting, and uses dry runs for new templates.
 | Tool | Purpose |
 |---|---|
 | `status()` | Extension connected?, versions, running jobs, open tabs, last results. Call first. |
+| `list_browsers(check_accounts=False)` | Connected browsers (Chrome profiles, Brave, Edge...) and what each one posts to; with `True` also reads who is logged in where. |
+| `use_browser(browser, platforms=None)` | Name or id: the default browser, or the route for those platforms. `"auto"` routes each platform to the browser logged in to it; `"none"` clears. |
 | `check_accounts(platforms=["youtube","facebook","tiktok"])` | Opens each upload page, returns `{platform: {logged_in, account, detail}}`. |
 | `publish(platform, video, caption, title="", tags=[], schedule_at=None, options={}, dry_run=False, keep_tab=False)` | One video to one platform. |
 | `publish_batch(jobs, max_parallel=3, dry_run=False, keep_tab=False)` | Several jobs (same fields as `publish`, plus `caption_file`). All are validated first. |
@@ -605,6 +607,7 @@ the next call takes over the port.
 | Extension badge says **off** | Normal when no agent is running. Start your agent (or run `social-publish-mcp status`). Check the port in the popup matches `SOCIAL_PUBLISH_PORT`. |
 | `ERR_CONNECTION_REFUSED` in the extension's errors page | Same as above: the server is not running. Harmless; it retries automatically. |
 | `not allowed` / close code 4004 | Another extension id is pinned. Delete `~/.social-publish-mcp/extensions.json` and reconnect, or add the id to `SOCIAL_PUBLISH_EXTENSION_IDS`. |
+| Several browsers connected, jobs refused with "none is chosen" | Open the extension popup and press **Scan accounts** or **Use**, or run `use_browser("auto")`. Each platform can post from a different browser. |
 | `check_accounts` says not logged in | Open the platform page in that Chrome profile and log in. YouTube "permission" page means the wrong channel: pass `channel_id`. |
 | A job failed at a step | Open the screenshot in the result (`artifacts/<job-id>/`). Run the same job with `dry_run=true, keep_tab=true` to watch it. |
 | "started debugging this browser" bar cancelled | The running job fails cleanly; start it again. |

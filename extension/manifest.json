@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Social Publish MCP",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Lets your local social-publish-mcp server upload and schedule videos on YouTube Studio, Meta Business Suite and TikTok Studio in your own Chrome.",
   "minimum_chrome_version": "116",
-  "permissions": ["debugger", "tabs", "tabGroups", "storage", "alarms"],
+  "permissions": ["debugger", "tabs", "tabGroups", "storage", "alarms", "identity", "identity.email"],
   "host_permissions": [
     "https://studio.youtube.com/*",
     "https://www.youtube.com/*",

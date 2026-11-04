@@ -220,6 +220,17 @@ async def test_missing_playlist_lists_available():
 
 
 # --------------------------------------------------------------------------- schedule
+async def test_video_processing_dialog_counts_as_scheduled():
+    # YouTube accepts the post before SD is ready: heading "Video processing", no share link in the dialog
+    when = datetime(2030, 3, 31, 23, 30, tzinfo=timezone.utc)
+    text = "Video processing\nYour video will be set to public on April 1, 2030 at 1:30 AM after the standard definition"
+    page = make_page(date_text="Apr 1, 2030", time_value="1:30 AM", done_label="Schedule",
+                     result={"heading": "Video processing", "text": text, "links": [SHORT]})
+    r = await yt.publish(page, job(schedule_at=when))
+    assert r.ok and r.status == "scheduled" and r.scheduled_for == "2030-04-01T01:30:00+02:00"
+    assert "processing" in yt.JS_RESULT and "will be (set to" in yt.JS_RESULT
+
+
 async def test_schedule_converts_to_studio_zone():
     when = datetime(2030, 3, 31, 23, 30, tzinfo=timezone.utc)  # = Apr 1, 01:30 in GMT+2
     text = "Video scheduled\nYour video will be set to public on Apr 1, 2030 at 1:30 AM\n" + SHORT

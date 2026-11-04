@@ -182,7 +182,7 @@ class Runner:
             if problems:
                 raise ValidationError(problems)
             driver = drivers.get(job.platform)
-            tab_id = await self.bridge.open_tab("about:blank")
+            tab_id = await self.bridge.open_tab("about:blank", browser=job.options.get("browser"), platform=job.platform)
             page = Page(ExtensionTransport(self.bridge, tab_id), artifacts_dir=self.artifacts_dir(job_id))
             await page.goto(driver.START_URL)
             result = await asyncio.wait_for(driver.publish(page, job, dry_run=dry_run), timeout)
@@ -198,9 +198,9 @@ class Runner:
             result = await self._failed(job, page, tab_id, f"unexpected {type(e).__name__}: {e}")
         finally:
             self.running.pop(job_id, None)
-        if tab_id is not None and not keep_tab:
+        if tab_id is not None:
             try:
-                await self.bridge.close_tab(tab_id)
+                await (self.bridge.keep_tab(tab_id) if keep_tab else self.bridge.close_tab(tab_id))
             except BridgeError:
                 pass
         self._record(job_id, job, result, dry_run=dry_run, seconds=time.monotonic() - started)
@@ -220,7 +220,35 @@ class Runner:
 
         return list(await asyncio.gather(*(one(j) for j in jobs)))
 
-    async def check_accounts(self, platforms: Iterable[str] = PLATFORMS) -> dict[str, dict[str, Any]]:
+    async def scan_browsers(self, platforms: Iterable[str] = PLATFORMS) -> dict[str, Any]:
+        """Check every connected browser's accounts, then route each platform logged in to in exactly one of them.
+
+        A platform logged in to in several browsers keeps its route if that is one of them; otherwise it is reported
+        as ambiguous, because only the user knows which account is the right one.
+        """
+        platforms = list(dict.fromkeys(platforms))
+        found: dict[str, dict[str, Any]] = {}
+        for c in list(self.bridge.browsers.values()):
+            found[c.id] = await self.check_accounts(platforms, browser=c.id)
+            await self.bridge.remember_accounts(c.id, found[c.id])
+        current = self.bridge.prefs()["routes"]
+        routes: dict[str, str] = {}
+        ambiguous: dict[str, list[str]] = {}
+        missing: list[str] = []
+        for p in platforms:
+            owners = [b for b, acc in found.items() if acc.get(p, {}).get("logged_in")]
+            if len(owners) == 1:
+                routes[p] = owners[0]
+            elif not owners:
+                missing.append(p)
+            elif current.get(p) not in owners:
+                ambiguous[p] = owners
+        await self.bridge.set_routes(routes)
+        return {"accounts": found, "routed": routes, "ambiguous": ambiguous, "not_logged_in": missing,
+                **self.bridge.roster()}
+
+    async def check_accounts(self, platforms: Iterable[str] = PLATFORMS, *,
+                             browser: str | None = None) -> dict[str, dict[str, Any]]:
         """Open each platform's START_URL in a tab and ask its driver who is logged in (tabs are closed after)."""
         async def one(p: str) -> tuple[str, dict[str, Any]]:
             if p not in PLATFORMS:
@@ -228,7 +256,7 @@ class Runner:
             tab_id = None
             try:
                 driver = drivers.get(p)  # type: ignore[arg-type]
-                tab_id = await self.bridge.open_tab("about:blank")
+                tab_id = await self.bridge.open_tab("about:blank", browser=browser, platform=p)
                 page = Page(ExtensionTransport(self.bridge, tab_id), artifacts_dir=self.artifacts_dir(f"check-{p}"))
                 await page.goto(driver.START_URL)
                 info = await asyncio.wait_for(driver.check_login(page), CHECK_TIMEOUT)

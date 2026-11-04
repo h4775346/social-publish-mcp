@@ -14,6 +14,8 @@ that posts. Every post is public and permanent, so the rules below are not optio
 | tool | what it does |
 |---|---|
 | `status()` | extension connected?, versions, running jobs, open tabs, last results. Call it first. |
+| `list_browsers(check_accounts=False)` | connected browsers (Chrome profiles, Brave, Edge...), what each posts to, `needs_choice`. With True it also reads who is logged in where. |
+| `use_browser(browser, platforms=None)` | a name or id: default browser, or the route for those platforms. `"auto"` routes each platform to the browser logged in to it; `"none"` clears. |
 | `check_accounts(platforms=[...])` | opens each platform's upload page, reports `{logged_in, account, detail}`, closes the tabs. |
 | `publish(platform, video, caption, title="", tags=[], schedule_at=None, options={}, dry_run=False, keep_tab=False)` | one video to one platform. |
 | `publish_batch(jobs, max_parallel=3, dry_run=False, keep_tab=False)` | many posts: one video to several platforms, or a week of scheduled posts. Validates every job first; if one is invalid nothing runs. |
@@ -40,7 +42,10 @@ written. `title` is YouTube only (required there, ≤100 chars). Options:
 4. **Dry run first** for a new template, new account, new platform, or after a failure: `dry_run=True,
    keep_tab=True` fills everything and stops before the final Publish/Schedule click; ask the user to look at the
    tab, then run for real.
-5. Run `status()` before a batch and `check_accounts` when the account matters (several channels/pages).
+5. Several browsers: if `status()` says `needs_choice`, or a job is refused because none is chosen, run
+   `use_browser("auto")` and show the user the result. If a platform comes back `ambiguous`, ask which browser holds the
+   right account, then `use_browser(name, platforms=[...])`. Never pick for them. `options.browser` overrides one job.
+   Run `status()` before a batch and `check_accounts` when the account matters (several channels/pages).
 6. Human pace: jobs of the same platform run one after another automatically; do not loop `publish` to spam.
    Respect the user's own cadence rules (e.g. one long video a day).
 7. On failure read `message` and open the `screenshot` (a PNG path) before retrying. Do not retry a post blindly:

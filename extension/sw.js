@@ -3,20 +3,36 @@
 // its jobs (one tab per job, all in one "Social Publish" window and tab group), attaches chrome.debugger to them and
 // forwards CDP commands. All the site logic lives in the server's Python drivers.
 // The server recognises this extension by its chrome-extension:// Origin, so there is nothing to paste.
+// Every copy (Chrome profile, Brave, Edge...) has its own persistent browserId, so several can be connected at once;
+// the server decides which one runs a job, and the popup shows and changes that choice.
 const DEFAULT_PORT = 8797;
 const VERSION = chrome.runtime.getManifest().version;
 const PROTOCOL = '1.3';
 const GROUP_TITLE = 'Social Publish';
 
 let ws = null, state = 'disconnected', lastError = '', serverVersion = '', backoff = 1000, retryTimer = null, pingTimer = null;
-const tabs = new Map(); // tabId -> { attached, openedAt, url }
+const tabs = new Map(); // tabId -> { attached, openedAt, url, keep }
+let roster = null; // the server's view: { you, browsers, default, routes, needs_choice }
+let scanning = false;
+
+// am I the browser that posts? 'on' = yes, 'idle' = another browser does, 'pick' = several connected and no choice yet
+function role() {
+  if (!roster) return 'on';
+  if (roster.needs_choice) return 'pick';
+  const me = (roster.browsers || []).find(b => b.id === roster.you);
+  if (me && (me.is_default || (me.routes || []).length)) return 'on';
+  return (roster.browsers || []).filter(b => b.connected).length > 1 ? 'idle' : 'on';
+}
 
 function setState(s, err) {
   state = s;
   if (err !== undefined) lastError = err;
   const busy = s === 'connected' && tabs.size > 0;
-  chrome.action.setBadgeText({ text: busy ? String(tabs.size) : s === 'connected' ? 'on' : 'off' });
-  chrome.action.setBadgeBackgroundColor({ color: s === 'connected' ? (busy ? '#b7791f' : '#1a7f37') : '#b42318' });
+  const r = role();
+  chrome.action.setBadgeText({ text: busy ? String(tabs.size) : s === 'connected' ? r : 'off' });
+  chrome.action.setBadgeBackgroundColor({
+    color: s !== 'connected' ? '#b42318' : busy || r === 'pick' ? '#b7791f' : r === 'idle' ? '#667085' : '#1a7f37',
+  });
 }
 
 function retry(delay) {
@@ -35,29 +51,47 @@ async function connect() {
   try { await openSocket(); } finally { connecting = false; }
 }
 
+// who this copy is: a random id kept in this profile's storage, and the profile's Google account when Chrome shares it
+async function identity() {
+  let { browserId } = await chrome.storage.local.get('browserId');
+  if (!browserId) {
+    browserId = crypto.randomUUID().replace(/-/g, '').slice(0, 8);
+    await chrome.storage.local.set({ browserId });
+  }
+  let email = '';
+  try { email = (await chrome.identity.getProfileUserInfo({ accountStatus: 'ANY' })).email || ''; } catch { /* optional */ }
+  const brands = (navigator.userAgentData && navigator.userAgentData.brands) || [];
+  const brand = (brands.find(b => !/not.?a.?brand|chromium/i.test(b.brand)) || brands[0] || {}).brand || 'Chromium';
+  return { browserId, email, brand };
+}
+
 async function openSocket() {
   clearTimeout(retryTimer);
   const { port = DEFAULT_PORT } = await chrome.storage.local.get('port');
+  const me = await identity();
   setState('connecting');
   let sock;
   try { sock = new WebSocket(`ws://127.0.0.1:${port}`); } catch (e) { setState('disconnected', String(e)); retry(); return; }
   ws = sock;
-  sock.onopen = () => send(sock, { type: 'hello', role: 'extension', version: VERSION });
+  sock.onopen = () => send(sock, { type: 'hello', role: 'extension', version: VERSION, ...me });
   sock.onmessage = ev => {
     let msg; try { msg = JSON.parse(ev.data); } catch { return; }
     if (msg.type === 'welcome') {
       backoff = 1000; serverVersion = msg.server || ''; setState('connected', '');
+      if (msg.browser_id && msg.browser_id !== me.browserId) chrome.storage.local.set({ browserId: msg.browser_id }); // a copied profile
       clearInterval(pingTimer); // app-level traffic keeps the MV3 worker alive (Chrome 116+)
       pingTimer = setInterval(() => send(sock, { type: 'ping' }), 20000);
-    } else if (msg.type === 'error') lastError = msg.error;
+    } else if (msg.type === 'roster') { roster = msg; scanning = false; setState(state); }
+    else if (msg.type === 'error') { lastError = msg.error; scanning = false; }
     else if (msg.id !== undefined) handle(sock, msg); // every request runs concurrently, answered by id
   };
   sock.onclose = ev => {
     if (ws !== sock) return; // an older socket we already replaced
     clearInterval(pingTimer);
     ws = null;
+    roster = null;
     // 4002 = the server swapped in a newer socket from this same worker: its tabs are still in use
-    if (ev.code !== 4002) detachAll(); // the server's jobs died with the connection; drop the "debugging this browser" bar
+    if (ev.code !== 4002) closeJobTabs(); // the server's jobs died with the connection: no bar or empty tab left behind
     if (ev.code === 4004) { setState('not allowed', lastError || 'the server pinned another extension id; see extensions.json in ~/.social-publish-mcp'); retry(60000); }
     else { setState('disconnected', ev.reason || 'server not running: start your MCP client (Claude, Cursor...) with social-publish-mcp configured'); retry(); }
   };
@@ -76,6 +110,7 @@ async function dispatch(msg) {
     case 'open_tab': return openTab(msg.url || 'about:blank', !!msg.active);
     case 'cdp': return cdp(msg.tabId, msg.method, msg.params || {});
     case 'close_tab': return closeTab(msg.tabId);
+    case 'keep_tab': if (tabs.has(msg.tabId)) tabs.get(msg.tabId).keep = true; return {};
     case 'activate_tab': await chrome.tabs.update(msg.tabId, { active: true }); return {};
     case 'list_tabs': return { tabs: await listTabs() };
     default: throw new Error('unknown request type ' + msg.type);
@@ -152,8 +187,11 @@ async function listTabs() {
   return out;
 }
 
-function detachAll() {
-  for (const [tabId, t] of tabs) if (t.attached) chrome.debugger.detach({ tabId }).catch(() => {});
+function closeJobTabs() {
+  for (const [tabId, t] of tabs) {
+    if (t.attached) chrome.debugger.detach({ tabId }).catch(() => {});
+    if (!t.keep) chrome.tabs.remove(tabId).catch(() => {}); // keep = a dry run the user asked to look at
+  }
   tabs.clear();
   setState(state);
 }
@@ -189,11 +227,17 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       if (ws) ws.close(); ws = null; backoff = 1000; await connect();
     } else if (msg.type === 'reconnect') {
       backoff = 1000; await connect();
+    } else if (msg.type === 'useBrowser') {
+      lastError = ''; send(ws, { type: 'use_browser', browser: msg.browser, platforms: msg.platforms });
+    } else if (msg.type === 'setLabel') {
+      send(ws, { type: 'set_label', label: msg.label });
+    } else if (msg.type === 'scan') {
+      lastError = ''; scanning = true; send(ws, { type: 'scan' });
     } else if (msg.type === 'test') {
       try { test = { ok: true, text: await selfTest() }; } catch (e) { test = { ok: false, text: String((e && e.message) || e) }; }
     }
     const { port = DEFAULT_PORT } = await chrome.storage.local.get('port');
-    sendResponse({ state, lastError, port, version: VERSION, serverVersion, id: chrome.runtime.id, tabs: await listTabs(), test });
+    sendResponse({ state, lastError, port, version: VERSION, serverVersion, id: chrome.runtime.id, tabs: await listTabs(), test, roster, scanning, role: role() });
   })();
   return true;
 });

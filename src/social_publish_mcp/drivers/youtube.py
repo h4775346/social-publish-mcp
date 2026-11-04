@@ -433,10 +433,12 @@ JS_PROGRESS = f"""/*yt:progress*/ (d => {{
 JS_DIALOG_LINKS = f"""/*yt:links*/ (d => d ? [...d.querySelectorAll('a[href]')].map(a => a.href)
   .concat((d.innerText || '').match(/https?:\\/\\/\\S+/g) || []) : [])({_q(DLG)})"""
 
-# The success dialog, found by its heading text ("Video scheduled" / "Video published" / "Video saved") wherever it is
+# The success dialog, found by its heading text ("Video scheduled" / "Video published" / "Video saved" / "Video
+# processing" with the schedule sentence, shown when YouTube accepted the post before SD is ready) wherever it is
 # in the DOM (it may live inside ytcp-uploads-dialog), then its container's text and links.
 JS_RESULT = """/*yt:result*/ (() => {
-  const rx = /^Video (published|scheduled|saved)$/i;
+  // a scheduled video still processing gets the heading "Video processing" and "will be set to public on ..."
+  const rx = /^Video (published|scheduled|saved|processing)$/i;
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
     const head = (n.nodeValue || '').replace(/\\s+/g, ' ').trim();
@@ -446,6 +448,7 @@ JS_RESULT = """/*yt:result*/ (() => {
       + ' tp-yt-paper-dialog, [role=dialog]');
     if (!box) { box = el; for (let i = 0; i < 6 && box.parentElement; i++) box = box.parentElement; }
     const t = box.innerText || '';
+    if (/processing/i.test(head) && !/will be (set to|published|scheduled)/i.test(t)) continue;
     let links = [...box.querySelectorAll('a[href]')].map(a => a.href).concat(t.match(/https?:\\/\\/\\S+/g) || []);
     if (!links.some(l => /youtu\\.?be/.test(l)))
       links = links.concat([...document.querySelectorAll('a[href*="/shorts/"], a[href*="youtu.be/"], a[href*="watch?v="]')]

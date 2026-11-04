@@ -5,6 +5,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **Several browsers at the same time** (Chrome profiles, Brave, Edge). Each extension copy has its own persistent id,
+  so copies no longer knock each other off the bridge. New tools `list_browsers` and `use_browser`, CLI `browsers` and
+  `use-browser`, `options.browser` per job, `check_accounts(browser=...)`, and a `browsers` list in `status`.
+- Choice order: `options.browser` > platform route > default > the only browser connected. With several connected and
+  no choice, or with the chosen browser offline, jobs are refused before any tab opens: nothing posts from a guess.
+- `use_browser("auto")` and the popup's **Scan accounts** read who is logged in where and route each platform that is
+  logged in to in exactly one browser; platforms logged in to in several are reported as ambiguous.
+- Popup: a Browsers card (rename, Use, a route button per platform, logged-in ticks) and the badges `on`, `idle`, `pick`.
+  The default name is the profile's Google account (new permissions: `identity`, `identity.email`; stays on this computer).
+
+### Changed
+- When a connection drops, the extension closes its job tabs (except `keep_tab` ones) instead of leaving them open.
+- One browser disconnecting only interrupts that browser's jobs.
+
 ### Fixed
 - YouTube: real (non-dry) jobs timed out waiting for the "Video scheduled/published" dialog. The schedule time list
   stayed open after the time was typed and swallowed the click on "Schedule". Open dropdowns are now closed and

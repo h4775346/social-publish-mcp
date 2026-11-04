@@ -27,9 +27,11 @@ def free_port() -> int:
 class FakeExtension:
     """Plays the Chrome extension: answers open_tab / cdp / close_tab like sw.js does."""
 
-    def __init__(self, port: int, ext_id: str = "fakeextensionid") -> None:
+    def __init__(self, port: int, ext_id: str = "fakeextensionid", browser_id: str = "", label: str = "") -> None:
         self.port = port
         self.ext_id = ext_id
+        self.browser_id = browser_id
+        self.label = label
         self.ws: ClientConnection | None = None
         self.calls: list[dict[str, Any]] = []
         self.open_tabs: set[int] = set()
@@ -40,7 +42,8 @@ class FakeExtension:
 
     async def start(self) -> dict[str, Any]:
         self.ws = await connect(f"ws://127.0.0.1:{self.port}", origin=f"chrome-extension://{self.ext_id}")  # type: ignore[arg-type]
-        await self.ws.send(json.dumps({"type": "hello", "role": "extension", "version": "test"}))
+        await self.ws.send(json.dumps({"type": "hello", "role": "extension", "version": "test",
+                                       "browserId": self.browser_id, "label": self.label}))
         welcome = json.loads(await self.ws.recv())
         self._task = asyncio.create_task(self._loop())
         return welcome
