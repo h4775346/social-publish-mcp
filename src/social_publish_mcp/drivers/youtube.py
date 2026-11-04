@@ -434,7 +434,7 @@ JS_DIALOG_LINKS = f"""/*yt:links*/ (d => d ? [...d.querySelectorAll('a[href]')].
   .concat((d.innerText || '').match(/https?:\\/\\/\\S+/g) || []) : [])({_q(DLG)})"""
 
 # The success dialog, found by its heading text ("Video scheduled" / "Video published" / "Video saved" / "Video
-# processing" with the schedule sentence, shown when YouTube accepted the post before SD is ready) wherever it is
+# processing" with the schedule or publish sentence, shown when YouTube accepted the post before SD is ready) wherever it is
 # in the DOM (it may live inside ytcp-uploads-dialog), then its container's text and links.
 JS_RESULT = """/*yt:result*/ (() => {
   // a scheduled video still processing gets the heading "Video processing" and "will be set to public on ..."
@@ -448,7 +448,7 @@ JS_RESULT = """/*yt:result*/ (() => {
       + ' tp-yt-paper-dialog, [role=dialog]');
     if (!box) { box = el; for (let i = 0; i < 6 && box.parentElement; i++) box = box.parentElement; }
     const t = box.innerText || '';
-    if (/processing/i.test(head) && !/will be (set to|published|scheduled)/i.test(t)) continue;
+    if (/processing/i.test(head) && !/will be (set to|published|scheduled)|before your video is/i.test(t)) continue;
     let links = [...box.querySelectorAll('a[href]')].map(a => a.href).concat(t.match(/https?:\\/\\/\\S+/g) || []);
     if (!links.some(l => /youtu\\.?be/.test(l)))
       links = links.concat([...document.querySelectorAll('a[href*="/shorts/"], a[href*="youtu.be/"], a[href*="watch?v="]')]

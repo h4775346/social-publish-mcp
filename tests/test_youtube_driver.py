@@ -228,7 +228,7 @@ async def test_video_processing_dialog_counts_as_scheduled():
                      result={"heading": "Video processing", "text": text, "links": [SHORT]})
     r = await yt.publish(page, job(schedule_at=when))
     assert r.ok and r.status == "scheduled" and r.scheduled_for == "2030-04-01T01:30:00+02:00"
-    assert "processing" in yt.JS_RESULT and "will be (set to" in yt.JS_RESULT
+    assert "processing" in yt.JS_RESULT and "will be (set to" in yt.JS_RESULT and "before your video is" in yt.JS_RESULT
 
 
 async def test_schedule_converts_to_studio_zone():
